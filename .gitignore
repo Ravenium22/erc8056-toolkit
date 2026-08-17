@@ -7,3 +7,6 @@ broadcast/
 !.env.example
 node_modules/
 *.log
+
+# Personal drafts, not part of the library.
+FORUM_POST_DRAFT.md
