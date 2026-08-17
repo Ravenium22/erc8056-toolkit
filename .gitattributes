@@ -1,0 +1,20 @@
+# Line endings are normalised to LF in the repository and on checkout,
+# regardless of the contributor's platform or `core.autocrlf` setting.
+#
+# This is not cosmetic. CI runs `forge fmt --check` as its first step, and
+# forge fmt treats CRLF as a formatting violation -- so a Windows contributor
+# with autocrlf=true can commit a tree that passes locally and fails CI, with
+# a diff that looks empty. Pinning `eol=lf` removes the failure mode.
+
+* text=auto eol=lf
+
+*.sol   text eol=lf diff=solidity
+*.toml  text eol=lf
+*.md    text eol=lf
+*.txt   text eol=lf
+*.yml   text eol=lf
+*.json  text eol=lf
+*.sh    text eol=lf
+
+# Keep the survey script executable on clone.
+script/survey.sh text eol=lf
