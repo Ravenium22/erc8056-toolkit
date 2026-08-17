@@ -145,6 +145,7 @@ contract ForkTokenSurveyTest is Test {
         emit log_named_uint("effectiveAt    ", when);
         emit log_named_uint("block.timestamp", block.timestamp);
 
+        // The rule under test is itself a timestamp comparison.
         bool genuinelyPending = (next != current) && (when > block.timestamp);
         assertEq(
             consumer.isMultiplierPending(AAPL),

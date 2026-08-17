@@ -288,6 +288,9 @@ contract ScaledUIOracle {
 
         if (answeredInRound < roundId) revert IncompleteRound(roundId, answeredInRound);
         if (answer <= 0) revert NonPositivePrice(answer);
+        // Oracle freshness is a wall-clock property; block.timestamp is the only
+        // clock available to compare a feed's `updatedAt` against. Sequencer drift
+        // is orders of magnitude below any sane `maxStaleness`.
         if (answeredAt > block.timestamp) revert FuturePrice(answeredAt, block.timestamp);
 
         uint256 age = block.timestamp - answeredAt;
@@ -305,6 +308,7 @@ contract ScaledUIOracle {
 
         if (answeredInRound < roundId) return (false, 0, answeredAt);
         if (answer <= 0) return (false, 0, answeredAt);
+        // Mirrors {_validatedAnswer}; same reasoning, same clock.
         if (answeredAt > block.timestamp) return (false, 0, answeredAt);
         if (block.timestamp - answeredAt > maxStaleness) return (false, 0, answeredAt);
 

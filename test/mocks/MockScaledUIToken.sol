@@ -136,6 +136,7 @@ contract MockScaledUIToken {
 
     /// @notice Schedule a genuinely pending change taking effect in the future.
     function scheduleAction(uint256 newMultiplier, uint256 effectiveAtTimestamp) external {
+        // Mock scheduling helper; a wall-clock comparison is the point.
         require(effectiveAtTimestamp > block.timestamp, "mock: effectiveAt must be in the future");
         _newUIMultiplier = newMultiplier;
         _effectiveAt = effectiveAtTimestamp;

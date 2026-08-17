@@ -16,9 +16,18 @@ jobs:
         with:
           submodules: recursive
 
+      # Pinned, not `stable`. This repo builds with `deny = "warnings"`, so a
+      # newer forge that adds a lint turns a green build red with no code change
+      # -- which is exactly what happened on the first push, when a `stable`
+      # runner flagged block.timestamp comparisons that v1.5.0 does not know
+      # about. Pinning keeps CI reproducible and consistent with the pinned
+      # solc and pinned dependencies.
+      #
+      # To bump: raise this version, run `forge build` locally with the same
+      # version, and resolve any new lints deliberately.
       - uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: stable
+          version: v1.5.0
 
       - name: Check formatting
         run: forge fmt --check

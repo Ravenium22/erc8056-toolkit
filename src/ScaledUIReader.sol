@@ -202,6 +202,10 @@ library ScaledUIReader {
         if (hasOk) {
             if (!has) return (false, 0);
             (bool pOk, uint256 pending) = _readUintAt(token, abi.encodeCall(IERC8056Scheduled.pendingMultiplier, ()), 1);
+            // block.timestamp is inherent to the question being asked: a corporate
+            // action is scheduled for a wall-clock instant, typically days out.
+            // Sequencer drift of a few seconds cannot flip this in any way that
+            // matters, and there is no alternative clock to compare against.
             if (pOk && pending > block.timestamp) return (true, pending);
             // Claims pending but will not say when: fall through to inference
             // rather than reporting a pending change with no timestamp.
@@ -214,6 +218,9 @@ library ScaledUIReader {
         if (!nOk || next == current) return (false, 0);
 
         (bool eOk, uint256 when) = _readUint(token, abi.encodeCall(IScaledUIAmountNewUIMultiplier.effectiveAt, ()));
+        // As above: `effectiveAt` is a wall-clock schedule set by the issuer, so
+        // comparing it to block.timestamp IS the specification. See the rule
+        // documented on {readScaled}.
         if (!eOk || when <= block.timestamp) return (false, 0);
 
         return (true, when);
