@@ -1,0 +1,9 @@
+out/
+cache/
+docs/
+broadcast/
+.env
+.env.*
+!.env.example
+node_modules/
+*.log

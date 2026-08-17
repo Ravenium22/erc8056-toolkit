@@ -1,0 +1,54 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+test = "test"
+
+# Pinned, not floating. A safety library must compile the same way for everyone
+# who audits it. See PLAN.md design rule 4.
+solc = "0.8.28"
+evm_version = "cancun"
+
+optimizer = true
+optimizer_runs = 200
+via_ir = false
+
+bytecode_hash = "none"
+cbor_metadata = false
+
+# Warnings are errors: an unused variable in a library whose entire pitch is
+# safety is a review finding waiting to happen.
+deny = "warnings"
+
+# `uiMultiplier`, `balanceOfUI`, `totalSupplyUI`, `toUIAmount` are spelled by
+# ERC-8056 itself, and `decimals` by ERC-20. Renaming any of them to satisfy a
+# naming lint would silently change the ABI, so the lints are excluded rather
+# than the names changed. These are the only exclusions.
+[lint]
+exclude_lints = ["mixed-case-function", "mixed-case-variable", "screaming-snake-case-const"]
+
+fs_permissions = [{ access = "read", path = "./out" }]
+
+[profile.default.fuzz]
+runs = 4096
+max_test_rejects = 500_000
+
+[profile.ci.fuzz]
+runs = 100_000
+
+[fmt]
+line_length = 120
+tab_width = 4
+bracket_spacing = false
+int_types = "long"
+multiline_func_header = "attributes_first"
+quote_style = "double"
+number_underscore = "thousands"
+sort_imports = true
+
+[rpc_endpoints]
+robinhood = "${RH_RPC_URL}"
+
+[doc]
+out = "docs"
+title = "erc8056-toolkit"
