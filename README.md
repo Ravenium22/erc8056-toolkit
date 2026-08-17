@@ -43,7 +43,7 @@ addresses each one, on chain, in Solidity.
 ## Install
 
 ```bash
-forge install <owner>/erc8056-toolkit
+forge install Ravenium22/erc8056-toolkit
 ```
 
 ```solidity
