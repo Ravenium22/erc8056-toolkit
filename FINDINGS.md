@@ -298,14 +298,45 @@ archive endpoint.
 Stated plainly, because a findings document that hides its gaps is not worth
 trusting.
 
-- **Chainlink feed addresses.** The Robinhood tokenized-equity feeds are not
-  enumerable: no registry contract, no address table in either the Chainlink or
-  Robinhood documentation, and no match by name on the block explorer. The
-  double-counting mechanism is documented by both parties and modelled faithfully
-  in `test/mocks/MockAggregatorV3.sol`, but **we have not read a live feed**, so
-  the 5.66 bps figure is derived from the multiplier rather than measured against
-  a production oracle. `ScaledUIOracle` takes a caller-supplied feed address, so
+- **Chainlink feed addresses — and no on-chain aggregator activity.** The
+  Robinhood tokenized-equity feeds are not enumerable: no registry contract, no
+  address table in either the Chainlink or Robinhood documentation, and no match
+  by name on the block explorer.
+
+  We then searched on chain by event signature, which is how a push-based
+  aggregator is normally found, and got nothing:
+
+  ```bash
+  RPC=https://rpc.mainnet.chain.robinhood.com
+  L=$(cast block-number --rpc-url $RPC)
+  for sig in "AnswerUpdated(int256,uint256,uint256)" \
+             "NewRound(uint256,address,uint256)" \
+             "NewTransmission(uint32,int192,address,uint32,int192[],bytes,bytes32)"; do
+    cast logs --from-block $((L-50000)) --to-block latest "$sig" --rpc-url $RPC
+  done
+  # -> no results for any signature
+  ```
+
+  **No contract on Robinhood Chain emitted a standard Chainlink aggregator event
+  over the ~85-minute queryable window.** (Control: an unfiltered `eth_getLogs`
+  over 2,000 blocks exceeds the RPC's 10,000-log cap, so logs are plentiful and
+  the query path works.)
+
+  We do not know why. Candidate explanations, none confirmed: the feeds publish
+  less often than the window; they are deployed but idle; or pricing is delivered
+  by a pull-based mechanism rather than the push aggregators the Robinhood
+  documentation shows. The documentation is explicit that consumers should call
+  `latestRoundData()`, so a conventional aggregator is the intended surface.
+
+  The consequence for this repository: the double-counting mechanism is
+  documented by both Chainlink and Robinhood and modelled faithfully in
+  `test/mocks/MockAggregatorV3.sol`, but **we have not read a live feed**, so the
+  5.66 bps figure is derived from the multiplier rather than measured against a
+  production oracle. `ScaledUIOracle` takes a caller-supplied feed address, so
   this does not affect its design — only the depth of its fork testing.
+
+  This is the open question most worth putting to Chainlink and Robinhood
+  directly.
 
 - **The `UIMultiplierUpdated` event for the AAPL action.** The state change is
   confirmed by direct reads, but the emitting transaction sits outside the RPC's
