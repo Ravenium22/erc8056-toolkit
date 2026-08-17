@@ -5,7 +5,7 @@ libs = ["lib"]
 test = "test"
 
 # Pinned, not floating. A safety library must compile the same way for everyone
-# who audits it. See PLAN.md design rule 4.
+# who audits it. See the design rules in README.md.
 solc = "0.8.28"
 evm_version = "cancun"
 
