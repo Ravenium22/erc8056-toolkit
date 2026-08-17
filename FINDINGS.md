@@ -19,6 +19,7 @@ line, read this one:
 4. [Two detection bugs](#4-two-detection-bugs)
 5. [Reproducing this](#5-reproducing-this)
 6. [What we could not verify](#6-what-we-could-not-verify)
+7. [The feed addresses](#7-the-feed-addresses)
 
 ---
 
@@ -114,9 +115,16 @@ natural next step is to apply the multiplier yourself:
 uint256 value = uint256(price) * token.uiMultiplier() / 1e18;
 ```
 
-That squares the multiplier. Today on AAPL it over-values a position by 5.66 bps.
-After a 2:1 split it over-values it by **100%** — a collateral valuation that says
-a position is worth twice what it is.
+That squares the multiplier. **Measured against the live AAPL feed**
+(`0x6B22A786bAa607d76728168703a39Ea9C99f2cD0`), valuing one raw token:
+
+```
+feed answer (already multiplier-inclusive) : $305.47782706   <- correct
+naive, multiplier applied again            : $305.65075196   <- 5.66 bps too high
+```
+
+After a 2:1 split the same code over-values by **100%** — a collateral valuation
+that says a position is worth twice what it is.
 
 ```solidity
 // RIGHT. The feed's answer is already price-per-raw-token.
@@ -298,45 +306,15 @@ archive endpoint.
 Stated plainly, because a findings document that hides its gaps is not worth
 trusting.
 
-- **Chainlink feed addresses — and no on-chain aggregator activity.** The
-  Robinhood tokenized-equity feeds are not enumerable: no registry contract, no
-  address table in either the Chainlink or Robinhood documentation, and no match
-  by name on the block explorer.
-
-  We then searched on chain by event signature, which is how a push-based
-  aggregator is normally found, and got nothing:
-
-  ```bash
-  RPC=https://rpc.mainnet.chain.robinhood.com
-  L=$(cast block-number --rpc-url $RPC)
-  for sig in "AnswerUpdated(int256,uint256,uint256)" \
-             "NewRound(uint256,address,uint256)" \
-             "NewTransmission(uint32,int192,address,uint32,int192[],bytes,bytes32)"; do
-    cast logs --from-block $((L-50000)) --to-block latest "$sig" --rpc-url $RPC
-  done
-  # -> no results for any signature
-  ```
-
-  **No contract on Robinhood Chain emitted a standard Chainlink aggregator event
-  over the ~85-minute queryable window.** (Control: an unfiltered `eth_getLogs`
-  over 2,000 blocks exceeds the RPC's 10,000-log cap, so logs are plentiful and
-  the query path works.)
-
-  We do not know why. Candidate explanations, none confirmed: the feeds publish
-  less often than the window; they are deployed but idle; or pricing is delivered
-  by a pull-based mechanism rather than the push aggregators the Robinhood
-  documentation shows. The documentation is explicit that consumers should call
-  `latestRoundData()`, so a conventional aggregator is the intended surface.
-
-  The consequence for this repository: the double-counting mechanism is
-  documented by both Chainlink and Robinhood and modelled faithfully in
-  `test/mocks/MockAggregatorV3.sol`, but **we have not read a live feed**, so the
-  5.66 bps figure is derived from the multiplier rather than measured against a
-  production oracle. `ScaledUIOracle` takes a caller-supplied feed address, so
-  this does not affect its design — only the depth of its fork testing.
-
-  This is the open question most worth putting to Chainlink and Robinhood
-  directly.
+- **~~Chainlink feed addresses~~ — RESOLVED, see [§7](#7-the-feed-addresses).**
+  An earlier revision of this document reported that no contract on Robinhood
+  Chain emits Chainlink aggregator events, and treated that as an open question.
+  **That was wrong, and the error was ours.** `cast logs` silently swallows the
+  RPC's `-32000: logs matched by query exceeds limit of 10000` error and prints
+  nothing, so every wide-range scan we ran reported "no results" when it had in
+  fact failed. The feeds exist, are live, and are now measured against directly.
+  The retraction is kept here rather than deleted, because a findings document
+  that quietly edits away its mistakes is not worth trusting either.
 
 - **The `UIMultiplierUpdated` event for the AAPL action.** The state change is
   confirmed by direct reads, but the emitting transaction sits outside the RPC's
@@ -347,6 +325,66 @@ trusting.
 - **Whether the event-name divergence is intentional.** We report the mismatch as
   observed. We have not confirmed which of the ERC text or the deployed
   implementation is considered authoritative.
+
+---
+
+## 7. The feed addresses
+
+The Chainlink feeds for Robinhood Stock Tokens are **not** listed in the
+Robinhood or Chainlink documentation pages, are not resolvable from any on-chain
+registry, and do not match by name on the block explorer. They are published in
+Chainlink's reference data directory:
+
+```
+https://reference-data-directory.vercel.app/feeds-robinhood-mainnet.json
+```
+
+56 feeds, 35 of them Robinhood equity/ETF feeds, all **8-decimal**. The four this
+repository fork-tests against:
+
+| Token | Token address | Chainlink proxy | `description()` |
+|---|---|---|---|
+| AAPL | `0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9` | `0x6B22A786bAa607d76728168703a39Ea9C99f2cD0` | `Robinhood AAPL / USD` |
+| TSLA | `0x322F0929c4625eD5bAd873c95208D54E1c003b2d` | `0x4A1166a659A55625345e9515b32adECea5547C38` | `RHTSLA / USD` |
+| NVDA | `0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC` | `0x379EC4f7C378F34a1B47E4F3cbeBCbAC3E8E9F15` | `RHNVDA / USD` |
+| SPY  | `0x117cc2133c37B721F49dE2A7a74833232B3B4C0C` | `0x319724394D3A0e3669269846abE664Cd621f9f6A` | `RHSPY / USD` |
+
+Three things to note.
+
+**`description()` is not a reliable identifier.** AAPL reports
+`Robinhood AAPL / USD`; TSLA reports `RHTSLA / USD`. Resolve feeds by address.
+
+**The feeds are low-frequency.** Observed answers were ~2 hours old and
+perfectly healthy. Derive `maxStaleness` from the documented heartbeat, and note
+the consequence: a staleness window generous enough for a 2-hour-old answer is
+also generous enough to pass a paused-and-held price, which leaves `oraclePaused`
+enforcement as the only remaining guard. See [§3](#3-oraclepaused-is-advisory-and-unenforced).
+
+**The measurement.** `test/fork/ForkOracle.t.sol` values one raw token of each
+against the live feed, both correctly and naively:
+
+```
+AAPL  safe $305.47782706   naive $305.65075196   -> 5.66 bps over-valued
+TSLA  safe $342.95500000   naive $342.95500000   -> identical (multiplier 1.0)
+NVDA  safe $225.02999999   naive $225.02999999   -> identical (multiplier 1.0)
+SPY   safe $777.07999999   naive $777.07999999   -> identical (multiplier 1.0)
+```
+
+Three of the four cannot tell a correct integration from a broken one. That is
+the whole finding in four lines.
+
+### A methodology warning, since we fell into it
+
+`cast logs` **silently swallows** the RPC error
+`-32000: logs matched by query exceeds limit of 10000` and prints nothing. A
+failed query is indistinguishable from a genuine "no results" unless you check
+the exit status or query via `cast rpc eth_getLogs` directly.
+
+We used wide-range `cast logs` scans to conclude that no Chainlink aggregator
+was emitting events on this chain, and published that as a finding. It was an
+artefact of the tooling, not a property of the chain. If you are hunting
+contracts by event signature on Robinhood Chain, keep ranges under ~5,000 blocks
+and verify against a known-active address first.
 
 ---
 

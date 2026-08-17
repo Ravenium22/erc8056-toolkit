@@ -116,8 +116,23 @@ src/ScaledUIOracle.sol        Chainlink wrapper. Enforces oraclePaused + stalene
 forge test                                        # unit + fuzz, no network
 FOUNDRY_PROFILE=ci forge test                     # 100k fuzz runs
 RH_RPC_URL=https://rpc.mainnet.chain.robinhood.com \
-  forge test --match-path 'test/fork/*'           # against live tokens
+  forge test --match-path 'test/fork/*' -vv       # live tokens AND live Chainlink feeds
 ```
+
+The fork suite values one raw token of AAPL, TSLA, NVDA and SPY against their
+real Chainlink feeds, correctly and naively side by side:
+
+```
+AAPL  safe $305.47782706   naive $305.65075196   -> 5.66 bps over-valued
+TSLA  safe $342.95500000   naive $342.95500000   -> identical (multiplier 1.0)
+NVDA  safe $225.02999999   naive $225.02999999   -> identical (multiplier 1.0)
+SPY   safe $777.07999999   naive $777.07999999   -> identical (multiplier 1.0)
+```
+
+Three of the four cannot tell a correct integration from a broken one.
+
+Feed addresses are in [FINDINGS.md §7](FINDINGS.md#7-the-feed-addresses) — they
+are not in the Robinhood or Chainlink docs and are not resolvable on chain.
 
 Fork tests read at `latest` and assert invariants rather than pinning to a block:
 the public Robinhood Chain RPC is not an archive node and retains roughly ten
